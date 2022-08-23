@@ -59,6 +59,18 @@ pub fn browser(cx: &mut Context) {
                         });
                     },
                     |cx| {
+                        // search box stuff
+                        Label::new(cx, "SEARCH"); //.text_wrap(false).class("small");
+                        Textbox::new(
+                            cx,
+                            UiData::state
+                                .then(UiState::browser.then(BrowserState::search_expression)),
+                        )
+                        .on_submit(|cx, text, _| {
+                            cx.emit(BrowserEvent::SetSearchExpression(text));
+                        })
+                        .height(Auto);
+
                         // The tree view of files in the browser in constructed recursively from the root file.
                         // Bind to the root file so that if it changes the tree view will be rebuilt.
                         // TODO: Add more levels for the treeview
@@ -67,30 +79,48 @@ pub fn browser(cx: &mut Context) {
                                 cx,
                                 UiData::state.then(UiState::browser.then(BrowserState::root_file)),
                                 0,
+                                UiData::state
+                                    .then(UiState::browser.then(BrowserState::search_expression)),
                                 directory_header,
                                 |cx, item, level| {
                                     treeview(
                                         cx,
                                         item,
                                         level,
+                                        UiData::state.then(
+                                            UiState::browser.then(BrowserState::search_expression),
+                                        ),
                                         directory_header,
                                         |cx, item, level| {
                                             treeview(
                                                 cx,
                                                 item,
                                                 level,
+                                                UiData::state.then(
+                                                    UiState::browser
+                                                        .then(BrowserState::search_expression),
+                                                ),
                                                 directory_header,
                                                 |cx, item, level| {
                                                     treeview(
                                                         cx,
                                                         item,
                                                         level,
+                                                        UiData::state.then(
+                                                            UiState::browser.then(
+                                                                BrowserState::search_expression,
+                                                            ),
+                                                        ),
                                                         directory_header,
                                                         |cx, item, level| {
                                                             treeview(
                                                                 cx,
                                                                 item,
                                                                 level,
+                                                                UiData::state
+                                                                    .then(UiState::browser.then(
+                                                                    BrowserState::search_expression,
+                                                                )),
                                                                 directory_header,
                                                                 file,
                                                             );
@@ -234,37 +264,56 @@ where
     });
 }
 
-fn treeview<L>(
+fn treeview<L, S>(
     cx: &mut Context,
-    lens: L,
+    root_file: L,
     level: u32,
+    search_expression: S,
     header: impl Fn(&mut Context, L, u32),
     content: impl Fn(&mut Context, Then<Then<L, children>, Index<Vec<File>, File>>, u32) + 'static,
 ) where
     L: Lens<Target = File>,
+    S: Lens<Target = String>,
     L::Source: Model,
 {
     let content = Rc::new(content);
     VStack::new(cx, |cx| {
         // Label::new(cx, lens.clone().then(File::name));
-        (header)(cx, lens.clone(), level);
-        Binding::new(cx, lens.clone().then(File::is_open), move |cx, is_open| {
+        (header)(cx, root_file.clone(), level);
+
+        Binding::new(cx, root_file.clone().then(File::is_open), move |cx, is_open| {
             if is_open.get(cx) {
                 let content1 = content.clone();
-                let lens2 = lens.clone();
-                VStack::new(cx, |cx| {
-                    List::new(cx, lens2.clone().then(File::children), move |cx, index, item| {
-                        (content1.clone())(cx, item.clone(), level + 1);
-                    })
-                    .height(Auto);
+                let root_file2 = root_file.clone();
+                let search_expression = search_expression.clone();
 
-                    let file_path1 = lens2.clone().get(cx).file_path.clone();
+                VStack::new(cx, |cx| {
+                    // list of files in the browser
+
+                    Binding::new(cx, search_expression.clone(), move |cx, search_expression| {
+                        let file_children = root_file2.clone().then(File::children);
+                        let content2 = content1.clone();
+
+                        List::new(cx, file_children, move |cx, index, item| {
+                            let file = item.clone();
+
+                            if is_valid_file(file.get(cx), &search_expression.clone().get(cx)) {
+                                (content2.clone())(cx, file, level + 1);
+                            }
+                        })
+                        .height(Auto);
+                    });
+
+                    let root_file3 = root_file.clone();
+                    let file_path1 = root_file3.clone().get(cx).file_path.clone();
+
+                    // lines drawn in front of directories to show focus
                     Element::new(cx)
                         .left(Pixels(15.0 * (level + 1) as f32 - 5.0))
                         .height(Stretch(1.0))
-                        .width(Pixels(1.0))
+                        .width(Pixels(2.0))
                         .position_type(PositionType::SelfDirected)
-                        .display(lens2.then(File::is_open))
+                        .display(root_file3.then(File::is_open))
                         .class("dir-line")
                         .toggle_class(
                             "focused",
@@ -293,6 +342,17 @@ fn treeview<L>(
         });
     })
     .height(Auto);
+}
+
+fn is_valid_file(file: File, searchstring: &str) -> bool {
+    if file.name.to_lowercase().contains(&searchstring.to_lowercase()) {
+        true
+    } else {
+        for child in file.children {
+            is_valid_file(child, &searchstring.to_owned());
+        }
+        false
+    }
 }
 
 fn dir_path(path: &Path) -> Option<&Path> {

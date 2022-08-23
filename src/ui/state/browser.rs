@@ -7,6 +7,7 @@ use vizia::prelude::*;
 pub struct BrowserState {
     pub root_file: File,
     pub selected: Option<PathBuf>,
+    pub search_expression: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -19,6 +20,8 @@ pub enum BrowserEvent {
     ToggleOpen,
     PlaySelected,
     StopSelected,
+    SetSearchExpression(String),
+    Refresh,
 }
 
 #[derive(Debug, Clone, Data, Lens)]
@@ -45,6 +48,7 @@ impl Default for BrowserState {
                 is_open: true,
             },
             selected: Some(PathBuf::from("assets/test_files")),
+            search_expression: String::from("..."),
         }
     }
 }
@@ -52,6 +56,22 @@ impl Default for BrowserState {
 impl Model for BrowserState {
     fn event(&mut self, cx: &mut EventContext, event: &mut Event) {
         event.map(|browser_event, _| match browser_event {
+            BrowserEvent::SetSearchExpression(search_expression) => {
+                self.search_expression = search_expression.clone();
+                cx.emit(BrowserEvent::Refresh);
+            }
+
+            BrowserEvent::Refresh => {
+                println!("Refresh browser");
+
+                // let test = self.root_file.file_path.clone();
+                // let test2 = self.root_file.file_path.clone();
+                // toggle_open(&mut self.root_file, &test.unwrap());
+                // toggle_open(&mut self.root_file, &test2.unwrap());
+
+                //cx.emit(BrowserEvent::SetRootPath(Path::new("D:/SAMPLES/HEX").to_path_buf()));
+            }
+
             // Temp: Load the assets directory for the treeview
             BrowserEvent::ViewAll => {
                 if let Some(root) = visit_dirs(&Path::new("assets/test_files")) {
