@@ -1,18 +1,19 @@
 use std::path::{Path, PathBuf};
 
+use self::browser_node_tree::Tree;
+
 use super::UiEvent;
 use vizia::prelude::*;
 
-#[derive(Debug, Lens, Clone, Data)]
+#[derive(Debug, Clone, Lens)]
 pub struct BrowserState {
-    pub root_node: BrowserNode,
+    pub tree: Tree,
     pub selected: Option<PathBuf>,
     pub search_expression: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BrowserEvent {
-    ViewAll,
     SetRoot(PathBuf),
     SetSelected(PathBuf),
     SelectNext,
@@ -23,18 +24,21 @@ pub enum BrowserEvent {
     SetSearchExpression(String),
 }
 
-mod browser_node_tree {
+pub mod browser_node_tree {
+    use std::{fs::File, path::PathBuf};
+
+    use basedrop::Node;
     use vizia::prelude::Lens;
 
-    #[derive(Debug)]
-    enum NodeType {
-        Root,
-        File,
-        Directory,
+    #[derive(Debug, Clone)]
+    pub enum NodeType {
+        Root(RootNode),
+        File(FileNode),
+        Directory(DirectoryNode),
     }
 
-    #[derive(Debug, Lens)]
-    struct Tree {
+    #[derive(Debug, Clone, Lens)]
+    pub struct Tree {
         label: String,
         children: Vec<NodeType>,
     }
@@ -46,14 +50,41 @@ mod browser_node_tree {
     }
 
     impl Tree {
-        fn new() -> Self {
+        pub fn empty() -> Self {
             Self::default()
+        }
+
+        pub fn update(&mut self, path: &PathBuf) -> Option<Self> {
+            let children = vec![];
+
+            // todo - default label should be stored somewhere static so we can just take it from there instead
+            Some(Self { label: String::from(&self.label), children })
         }
     }
 
-    struct RootNode {}
-    struct FileNode {}
-    struct DirectoryNode {}
+    #[derive(Debug, Clone)]
+    pub struct RootNode {}
+
+    #[derive(Debug, Clone)]
+    pub struct FileNode {}
+
+    #[derive(Debug, Clone)]
+    pub struct DirectoryNode {}
+    impl RootNode {
+        pub fn new() -> Self {
+            Self {}
+        }
+    }
+    impl FileNode {
+        pub fn new() -> Self {
+            Self {}
+        }
+    }
+    impl DirectoryNode {
+        pub fn new() -> Self {
+            Self {}
+        }
+    }
 }
 
 #[derive(Debug, Clone, Data, Lens)]
@@ -80,13 +111,7 @@ impl Default for BrowserNode {
 impl Default for BrowserState {
     fn default() -> Self {
         Self {
-            root_node: BrowserNode {
-                name: String::from("root"),
-                file_path: Some(PathBuf::from("assets/test_files")),
-                children: vec![],
-                is_open: true,
-                is_visible: true,
-            },
+            tree: Tree::empty(),
             selected: Some(PathBuf::from("assets/test_files")),
             search_expression: String::from("..."),
         }
@@ -98,20 +123,13 @@ impl Model for BrowserState {
         event.map(|browser_event, _| match browser_event {
             BrowserEvent::SetSearchExpression(search_expression) => {
                 self.search_expression = search_expression.clone();
-                self.root_node = filter_root_node(search_expression, &mut self.root_node);
-            }
-
-            // Temp: Load the assets directory for the treeview // todo remove
-            BrowserEvent::ViewAll => {
-                if let Some(root) = build_node_tree(&Path::new("assets/test_files")) {
-                    self.root_node = root;
-                }
+                //self.tree = filter_root_node(search_expression, &mut self.tree); //todo implement filter code
             }
 
             // Set the new root from where the browser build the file view
             BrowserEvent::SetRoot(path) => {
-                if let Some(root_node) = build_node_tree(path.as_path()) {
-                    self.root_node = root_node;
+                if let Some(root_node) = self.tree.update(path) {
+                    self.tree = root_node;
                 }
             }
 
@@ -132,7 +150,8 @@ impl Model for BrowserState {
             BrowserEvent::ToggleOpen => {
                 //println!("Toggle Open: {:?}", path);
                 if let Some(path) = &self.selected {
-                    toggle_open(&mut self.root_node, path);
+                    todo!()
+                    //toggle_open(&mut self.tree, path);
                 }
             }
 
@@ -143,20 +162,22 @@ impl Model for BrowserState {
 
             // Move selection the next directory item
             BrowserEvent::SelectNext => {
-                let next = recursive_next(&self.root_node, None, self.selected.clone());
-                match next {
-                    RetItem::Found(path) => self.selected = path,
-                    _ => {}
-                }
+                todo!()
+                // let next = recursive_next(&self.tree, None, self.selected.clone());
+                // match next {
+                //     RetItem::Found(path) => self.selected = path,
+                //     _ => {}
+                // }
             }
 
             // Move selection the previous directory item
             BrowserEvent::SelectPrev => {
-                let next = recursive_prev(&self.root_node, None, self.selected.clone());
-                match next {
-                    RetItem::Found(path) => self.selected = path,
-                    _ => {}
-                }
+                todo!()
+                // let next = recursive_prev(&self.tree, None, self.selected.clone());
+                // match next {
+                //     RetItem::Found(path) => self.selected = path,
+                //     _ => {}
+                // }
             }
         });
     }

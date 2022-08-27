@@ -13,9 +13,6 @@ use crate::ui::{Panel, ResizableStack, UiData, UiEvent, UiState};
 
 // A simple file browser.
 pub fn browser(cx: &mut Context) {
-    // For testing purposes this event is emitted on browser creation to trigger the browser state to update.
-    cx.emit(BrowserEvent::ViewAll);
-
     browser_keymap(cx);
 
     HStack::new(cx, |cx| {
@@ -75,45 +72,45 @@ pub fn browser(cx: &mut Context) {
                         // Bind to the root file so that if it changes the tree view will be rebuilt.
                         // TODO: Add more levels for the treeview
                         ScrollView::new(cx, 0.0, 0.0, false, false, |cx| {
-                            treeview(
-                                cx,
-                                UiData::state.then(UiState::browser.then(BrowserState::root_node)),
-                                0,
-                                directory_header,
-                                |cx, item, level| {
-                                    treeview(
-                                        cx,
-                                        item,
-                                        level,
-                                        directory_header,
-                                        |cx, item, level| {
-                                            treeview(
-                                                cx,
-                                                item,
-                                                level,
-                                                directory_header,
-                                                |cx, item, level| {
-                                                    treeview(
-                                                        cx,
-                                                        item,
-                                                        level,
-                                                        directory_header,
-                                                        |cx, item, level| {
-                                                            treeview(
-                                                                cx,
-                                                                item,
-                                                                level,
-                                                                directory_header,
-                                                                file,
-                                                            );
-                                                        },
-                                                    );
-                                                },
-                                            );
-                                        },
-                                    );
-                                },
-                            );
+                            // treeview(
+                            //     cx,
+                            //     UiData::state.then(UiState::browser.then(BrowserState::root_node)),
+                            //     0,
+                            //     directory_header,
+                            //     |cx, item, level| {
+                            //         treeview(
+                            //             cx,
+                            //             item,
+                            //             level,
+                            //             directory_header,
+                            //             |cx, item, level| {
+                            //                 treeview(
+                            //                     cx,
+                            //                     item,
+                            //                     level,
+                            //                     directory_header,
+                            //                     |cx, item, level| {
+                            //                         treeview(
+                            //                             cx,
+                            //                             item,
+                            //                             level,
+                            //                             directory_header,
+                            //                             |cx, item, level| {
+                            //                                 treeview(
+                            //                                     cx,
+                            //                                     item,
+                            //                                     level,
+                            //                                     directory_header,
+                            //                                     file,
+                            //                                 );
+                            //                             },
+                            //                         );
+                            //                     },
+                            //                 );
+                            //             },
+                            //         );
+                            //     },
+                            // );
                         })
                         .class("level3");
                     },
@@ -301,6 +298,7 @@ fn treeview<L>(
                 let root_file2 = root_file.clone();
                 //let search_expression = search_expression.clone();
 
+                // stack of elements (cal toggle opened or closed?
                 VStack::new(cx, |cx| {
                     // list of files in the browser
 

@@ -1,5 +1,7 @@
 use std::default;
 
+use crate::ui::browser_node_tree::*;
+
 use crate::ui::state::{BrowserEvent, BrowserNode, BrowserState, PanelEvent, PanelState};
 use crate::ui::{Panel, ResizableStack, UiData, UiState};
 use vizia::prelude::*;
@@ -88,6 +90,18 @@ impl FileViewMenu {
     }
 }
 
+struct NodeView {}
+
+impl NodeView {
+    fn new(node_type: NodeType) -> Self {
+        Self {}
+    }
+
+    fn build(&self, cx: &mut Context) {
+        Label::new(cx, "NODE ITEM");
+    }
+}
+
 struct FileView {}
 
 impl Default for FileView {
@@ -102,6 +116,12 @@ impl FileView {
     }
 
     fn build(&self, cx: &mut Context) {
+        // todo test code
+        let root_node = NodeType::Root(RootNode::new());
+        let file_node = NodeType::File(FileNode::new());
+        let directory_node = NodeType::Directory(DirectoryNode::new());
+
+        // todo end of test code
         Panel::new(
             cx,
             |cx| {
@@ -111,7 +131,15 @@ impl FileView {
                 // menu to adjust the file view
                 // todo - should be elsewhere
                 FileViewMenu::new().build(cx);
-                ScrollView::new(cx, 0.0, 0.0, false, false, |cx| {}).class("level3");
+                ScrollView::new(cx, 0.0, 0.0, false, false, |cx| {
+                    VStack::new(cx, |cx| {
+                        NodeView::new(root_node).build(cx);
+                        NodeView::new(file_node).build(cx);
+                        NodeView::new(directory_node).build(cx);
+                    })
+                    .height(Auto);
+                })
+                .class("level3");
             },
         )
         .display(
