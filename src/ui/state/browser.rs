@@ -1,14 +1,15 @@
 use std::path::{Path, PathBuf};
 
-use self::browser_state::BrowserTree;
+use self::browser_state::{BrowserTree, DirectoryNode, NodeType};
 
 use super::UiEvent;
+use log::info;
 use vizia::prelude::*;
 
 #[derive(Debug, Clone, Lens)]
 pub struct BrowserState {
     pub tree: BrowserTree,
-    pub selected: Option<PathBuf>,
+    pub selected: NodeType,
     pub search_expression: String,
 }
 
@@ -20,10 +21,10 @@ impl From<std::io::Error> for SomeError {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum BrowserEvent {
     SetRoot(PathBuf),
-    SetSelected(PathBuf),
+    SetSelected(NodeType),
     SelectNext,
     SelectPrev,
     ToggleOpen,
@@ -39,6 +40,13 @@ pub mod browser_state {
     use vizia::prelude::{Data, Lens};
 
     use super::SomeError;
+
+    #[derive(Debug, Clone, Lens, Data)]
+    struct TreeNode {
+        label: String,
+        node_type: NodeType,
+        is_selected: bool,
+    }
 
     #[derive(Debug, Clone, Lens, Data)]
     pub enum NodeType {
@@ -96,6 +104,8 @@ pub mod browser_state {
         pub label: String,
         pub path: PathBuf,
         pub children: Vec<NodeType>,
+        pub is_open: bool,
+        pub set_selected: bool,
     }
 
     impl FileNode {
@@ -105,7 +115,7 @@ pub mod browser_state {
     }
     impl DirectoryNode {
         pub fn new(label: String, path: PathBuf) -> Self {
-            Self { label, path, children: vec![] }
+            Self { label, path, children: vec![], is_open: false, set_selected: false }
         }
 
         pub fn recursive_scan(mut self) -> Result<NodeType, SomeError> {
@@ -165,32 +175,12 @@ pub mod browser_state {
         }
     }
 }
-#[derive(Debug, Clone, Data, Lens)]
-pub struct BrowserNode {
-    pub name: String,
-    pub file_path: Option<PathBuf>,
-    pub children: Vec<BrowserNode>,
-    pub is_open: bool,
-    pub is_visible: bool,
-}
-
-impl Default for BrowserNode {
-    fn default() -> Self {
-        Self {
-            name: String::new(),
-            file_path: None,
-            children: Vec::new(),
-            is_open: true,
-            is_visible: true,
-        }
-    }
-}
 
 impl Default for BrowserState {
     fn default() -> Self {
         Self {
             tree: BrowserTree::empty(),
-            selected: Some(PathBuf::from("assets/test_files")),
+            selected: NodeType::None,
             search_expression: String::from("..."),
         }
     }
@@ -211,11 +201,12 @@ impl Model for BrowserState {
 
             // Play the selected file
             BrowserEvent::PlaySelected => {
-                if let Some(path) = &self.selected {
-                    if path.is_file() {
-                        cx.emit(UiEvent::BrowserFileClicked(path.clone()));
-                    }
-                }
+                todo!()
+                // if let Some(path) = &self.selected {
+                //     if path.is_file() {
+                //         cx.emit(UiEvent::BrowserFileClicked(path.clone()));
+                //     }
+                // }
             }
 
             BrowserEvent::StopSelected => {
@@ -224,16 +215,19 @@ impl Model for BrowserState {
 
             // toggle open/closed a folder
             BrowserEvent::ToggleOpen => {
+                //todo!()
                 //println!("Toggle Open: {:?}", path);
-                if let Some(path) = &self.selected {
-                    todo!()
-                    //toggle_open(&mut self.tree, path);
+
+                if let NodeType::Directory(node) = &mut self.selected {
+                    node.is_open = !node.is_open;
                 }
             }
 
             // Set the selected directory item by path
-            BrowserEvent::SetSelected(path) => {
-                self.selected = Some(path.clone());
+            BrowserEvent::SetSelected(node) => {
+                info!("Toggle node ()");
+                self.selected = node.clone();
+                //self.selected = Some(path.clone());
             }
 
             // Move selection the next directory item
@@ -259,132 +253,132 @@ impl Model for BrowserState {
     }
 }
 
-fn filter_root_node(search_expression: &str, root_node: &mut BrowserNode) -> BrowserNode {
-    for node in &mut root_node.children {
-        if node.name.contains(search_expression) {
-            node.is_visible = true;
-        } else {
-            node.is_visible = false;
-        }
-    }
+// fn filter_root_node(search_expression: &str, root_node: &mut BrowserNode) -> BrowserNode {
+//     for node in &mut root_node.children {
+//         if node.name.contains(search_expression) {
+//             node.is_visible = true;
+//         } else {
+//             node.is_visible = false;
+//         }
+//     }
 
-    root_node.to_owned()
-}
+//     root_node.to_owned()
+// }
 
-#[derive(Debug, Clone)]
-enum RetItem<'a> {
-    Found(Option<PathBuf>),
-    NotFound(Option<&'a BrowserNode>),
-}
+// #[derive(Debug, Clone)]
+// enum RetItem<'a> {
+//     Found(Option<PathBuf>),
+//     NotFound(Option<&'a BrowserNode>),
+// }
 
-fn toggle_open(root: &mut BrowserNode, path: &PathBuf) {
-    if root.file_path == Some(path.clone()) {
-        root.is_open ^= true;
-    } else {
-        for child in root.children.iter_mut() {
-            toggle_open(child, path);
-        }
-    }
-}
+// fn toggle_open(root: &mut BrowserNode, path: &PathBuf) {
+//     if root.file_path == Some(path.clone()) {
+//         root.is_open ^= true;
+//     } else {
+//         for child in root.children.iter_mut() {
+//             toggle_open(child, path);
+//         }
+//     }
+// }
 
-// Returns the next directory item after `dir` by recursing down the hierarchy
-fn recursive_next<'a>(
-    root: &'a BrowserNode,
-    mut prev: Option<&'a BrowserNode>,
-    dir: Option<PathBuf>,
-) -> RetItem<'a> {
-    if let Some(prev) = prev {
-        if prev.file_path == dir {
-            return RetItem::Found(root.file_path.clone());
-        }
-    }
+// // Returns the next directory item after `dir` by recursing down the hierarchy
+// fn recursive_next<'a>(
+//     root: &'a BrowserNode,
+//     mut prev: Option<&'a BrowserNode>,
+//     dir: Option<PathBuf>,
+// ) -> RetItem<'a> {
+//     if let Some(prev) = prev {
+//         if prev.file_path == dir {
+//             return RetItem::Found(root.file_path.clone());
+//         }
+//     }
 
-    prev = Some(root);
-    if root.is_open {
-        for child in root.children.iter() {
-            let next = recursive_next(child, prev, dir.clone());
-            match next {
-                RetItem::Found(_) => return next,
-                RetItem::NotFound(file) => prev = file,
-            }
-        }
-    }
+//     prev = Some(root);
+//     if root.is_open {
+//         for child in root.children.iter() {
+//             let next = recursive_next(child, prev, dir.clone());
+//             match next {
+//                 RetItem::Found(_) => return next,
+//                 RetItem::NotFound(file) => prev = file,
+//             }
+//         }
+//     }
 
-    RetItem::NotFound(prev)
-}
+//     RetItem::NotFound(prev)
+// }
 
-// Returns the previous directory item before `dir` by recursing down the hierarchy
-fn recursive_prev<'a>(
-    root: &'a BrowserNode,
-    mut prev: Option<&'a BrowserNode>,
-    dir: Option<PathBuf>,
-) -> RetItem<'a> {
-    if root.file_path == dir {
-        if let Some(prev) = prev {
-            return RetItem::Found(prev.file_path.clone());
-        }
-    }
+// // Returns the previous directory item before `dir` by recursing down the hierarchy
+// fn recursive_prev<'a>(
+//     root: &'a BrowserNode,
+//     mut prev: Option<&'a BrowserNode>,
+//     dir: Option<PathBuf>,
+// ) -> RetItem<'a> {
+//     if root.file_path == dir {
+//         if let Some(prev) = prev {
+//             return RetItem::Found(prev.file_path.clone());
+//         }
+//     }
 
-    prev = Some(root);
-    if root.is_open {
-        for child in root.children.iter() {
-            let next = recursive_prev(child, prev, dir.clone());
-            match next {
-                RetItem::Found(_) => return next,
-                RetItem::NotFound(file) => prev = file,
-            }
-        }
-    }
+//     prev = Some(root);
+//     if root.is_open {
+//         for child in root.children.iter() {
+//             let next = recursive_prev(child, prev, dir.clone());
+//             match next {
+//                 RetItem::Found(_) => return next,
+//                 RetItem::NotFound(file) => prev = file,
+//             }
+//         }
+//     }
 
-    RetItem::NotFound(prev)
-}
+//     RetItem::NotFound(prev)
+// }
 
-// Recursively build directory tree from root path
-fn build_node_tree(root_directory: &Path) -> Option<BrowserNode> {
-    let name = format!("{}", root_directory.file_name()?.to_str()?);
-    let mut children = Vec::new();
+// // Recursively build directory tree from root path
+// fn build_node_tree(root_directory: &Path) -> Option<BrowserNode> {
+//     let name = format!("{}", root_directory.file_name()?.to_str()?);
+//     let mut children = Vec::new();
 
-    if root_directory.is_dir() {
-        for entry in std::fs::read_dir(root_directory).ok()? {
-            let entry = entry.ok()?;
-            let path = entry.path();
-            if path.is_dir() {
-                children.push(build_node_tree(&path)?);
-            } else {
-                children.push(BrowserNode {
-                    name: format!("{}", entry.path().file_name()?.to_str()?),
-                    file_path: Some(entry.path()),
-                    children: vec![],
-                    is_open: true,
-                    is_visible: true,
-                })
-            }
-        }
-    }
+//     if root_directory.is_dir() {
+//         for entry in std::fs::read_dir(root_directory).ok()? {
+//             let entry = entry.ok()?;
+//             let path = entry.path();
+//             if path.is_dir() {
+//                 children.push(build_node_tree(&path)?);
+//             } else {
+//                 children.push(BrowserNode {
+//                     name: format!("{}", entry.path().file_name()?.to_str()?),
+//                     file_path: Some(entry.path()),
+//                     children: vec![],
+//                     is_open: true,
+//                     is_visible: true,
+//                 })
+//             }
+//         }
+//     }
 
-    // Sort by alphabetical
-    children.sort_by(|a, b| a.name.cmp(&b.name));
-    // Sort by directory vs file
-    children.sort_by(|a, b| {
-        let a_is_dir: bool = a.children.is_empty();
-        let b_is_dir: bool = b.children.is_empty();
-        a_is_dir.cmp(&b_is_dir)
-    });
+//     // Sort by alphabetical
+//     children.sort_by(|a, b| a.name.cmp(&b.name));
+//     // Sort by directory vs file
+//     children.sort_by(|a, b| {
+//         let a_is_dir: bool = a.children.is_empty();
+//         let b_is_dir: bool = b.children.is_empty();
+//         a_is_dir.cmp(&b_is_dir)
+//     });
 
-    Some(BrowserNode {
-        name,
-        file_path: Some(PathBuf::from(root_directory)),
-        children,
-        is_open: true,
-        is_visible: true,
-    })
-}
+//     Some(BrowserNode {
+//         name,
+//         file_path: Some(PathBuf::from(root_directory)),
+//         children,
+//         is_open: true,
+//         is_visible: true,
+//     })
+// }
 
-// Return the path of a file directory
-fn dir_path(path: &Path) -> Option<&Path> {
-    if path.is_dir() {
-        Some(path)
-    } else {
-        path.parent()
-    }
-}
+// // Return the path of a file directory
+// fn dir_path(path: &Path) -> Option<&Path> {
+//     if path.is_dir() {
+//         Some(path)
+//     } else {
+//         path.parent()
+//     }
+// }

@@ -5,14 +5,28 @@ use crate::ui::{browser_state::*, state};
 use crate::ui::state::{BrowserEvent, BrowserState, PanelEvent, PanelState};
 use crate::ui::{Panel, ResizableStack, UiData, UiState};
 use log::info;
+use state::browser_state;
+use state::browser_state::node_type_derived_lenses::Directory;
 use vizia::prelude::*;
 
 pub mod browser_widgets {
     // todo better structure please, ffs boyyyy
 
-    use vizia::{prelude::Context, views::Label};
+    use log::info;
+    use vizia::{
+        prelude::{
+            Actions, Context, Lens,
+            Units::{Pixels, Stretch},
+        },
+        state::LensExt,
+        views::{HStack, Label},
+        window::CursorIcon,
+    };
 
-    use crate::ui::browser_state::{self, DirectoryNode, NodeType};
+    use crate::ui::{
+        browser_state::{self, DirectoryNode, NodeType},
+        BrowserEvent,
+    };
 
     pub struct File {}
 
@@ -22,8 +36,35 @@ pub mod browser_widgets {
 
     impl Directory {
         pub fn new(cx: &mut Context, node: DirectoryNode) {
+            info!("Draw Directory UI Element");
+
             let label = format!("{}", node.label);
-            Label::new(cx, &label);
+
+            HStack::new(cx, |cx| {
+                let rotation = match node.is_open {
+                    true => 0.0,
+                    false => -90.0,
+                };
+
+                Label::new(cx, "\u{e75c}")
+                    .font("icon")
+                    .height(Stretch(1.0))
+                    .child_top(Stretch(1.0))
+                    .child_bottom(Stretch(1.0))
+                    .hoverable(false)
+                    .rotate(rotation);
+
+                // File or directory name
+                Label::new(cx, &label).width(Stretch(1.0)).text_wrap(false).hoverable(false);
+            })
+            .cursor(CursorIcon::Hand)
+            .on_press(move |cx| {
+                cx.focus();
+                cx.emit(BrowserEvent::SetSelected(NodeType::Directory(node.clone())));
+                cx.emit(BrowserEvent::ToggleOpen);
+            })
+            .col_between(Pixels(4.0))
+            .child_left(Pixels(15.0 * 0 as f32 + 5.0));
         }
     }
 }
@@ -160,9 +201,10 @@ impl FileView {
                         move |cx, children| {
                             VStack::new(cx, |cx| {
                                 List::new(cx, children, move |cx, index, item| {
-                                    let item = item.clone().get(cx);
-                                    info!("list element {:?} {:?}", item, index);
-                                    match item {
+                                    let node = item.clone().get(cx);
+
+                                    info!("list element {:?} {:?}", node, index);
+                                    match node {
                                         NodeType::File(file) => {
                                             Label::new(cx, "FILE");
                                         }
