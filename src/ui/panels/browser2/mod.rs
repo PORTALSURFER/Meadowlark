@@ -60,7 +60,7 @@ pub mod browser_widgets {
             .cursor(CursorIcon::Hand)
             .on_press(move |cx| {
                 cx.focus();
-                cx.emit(BrowserEvent::SetSelected(NodeType::Directory(node.clone())));
+                //cx.emit(NodeEvent::SetSelected(NodeType::Directory(node.clone())));
                 cx.emit(BrowserEvent::ToggleOpen);
             })
             .col_between(Pixels(4.0))
@@ -204,7 +204,7 @@ impl FileView {
                                     let node = item.clone().get(cx);
 
                                     info!("list element {:?} {:?}", node, index);
-                                    match node {
+                                    match node.node_type {
                                         NodeType::File(file) => {
                                             Label::new(cx, "FILE");
                                         }

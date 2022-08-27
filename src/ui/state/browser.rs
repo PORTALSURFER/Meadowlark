@@ -41,11 +41,13 @@ pub mod browser_state {
 
     use super::SomeError;
 
+    pub enum NodeEvent {}
+
     #[derive(Debug, Clone, Lens, Data)]
-    struct TreeNode {
-        label: String,
-        node_type: NodeType,
-        is_selected: bool,
+    pub struct TreeNode {
+        pub label: String,
+        pub node_type: NodeType,
+        pub is_selected: bool,
     }
 
     #[derive(Debug, Clone, Lens, Data)]
@@ -58,7 +60,7 @@ pub mod browser_state {
     #[derive(Debug, Clone, Lens)]
     pub struct BrowserTree {
         pub label: String,
-        pub children: Vec<NodeType>,
+        pub children: Vec<TreeNode>,
     }
 
     impl Default for BrowserTree {
@@ -88,7 +90,11 @@ pub mod browser_state {
                     self.label,
                     path_buffer.to_str().unwrap()
                 );
-                self.children.push(NodeType::Directory(directory_node));
+
+                let node =
+                    TreeNode::new(String::from(&self.label), NodeType::Directory(directory_node));
+
+                self.children.push(node);
 
                 return Ok(());
             }
@@ -172,6 +178,11 @@ pub mod browser_state {
                 // Err(SomeError {}) // todo error handling, scanning something which is not a directory or file.
             }
             Ok(NodeType::None)
+        }
+    }
+    impl TreeNode {
+        pub(crate) fn new(label: String, node_type: NodeType) -> Self {
+            Self { label, node_type, is_selected: false }
         }
     }
 }
