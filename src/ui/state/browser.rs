@@ -1,15 +1,23 @@
 use std::path::{Path, PathBuf};
 
-use self::browser_node_tree::Tree;
+use self::browser_state::BrowserTree;
 
 use super::UiEvent;
 use vizia::prelude::*;
 
 #[derive(Debug, Clone, Lens)]
 pub struct BrowserState {
-    pub tree: Tree,
+    pub tree: BrowserTree,
     pub selected: Option<PathBuf>,
     pub search_expression: String,
+}
+
+#[derive(Debug)]
+pub struct SomeError {} //todo filler error type, need to define these properly
+impl From<std::io::Error> for SomeError {
+    fn from(_: std::io::Error) -> Self {
+        SomeError {}
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -24,69 +32,139 @@ pub enum BrowserEvent {
     SetSearchExpression(String),
 }
 
-pub mod browser_node_tree {
-    use std::{fs::File, path::PathBuf};
+pub mod browser_state {
+    //todo this is a mess, needs more logical structure
+    use log::info;
+    use std::{fs::File, io::Error, path::PathBuf};
+    use vizia::prelude::{Data, Lens};
 
-    use basedrop::Node;
-    use vizia::prelude::Lens;
+    use super::SomeError;
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Lens, Data)]
     pub enum NodeType {
-        Root(RootNode),
         File(FileNode),
         Directory(DirectoryNode),
+        None,
     }
 
     #[derive(Debug, Clone, Lens)]
-    pub struct Tree {
-        label: String,
-        children: Vec<NodeType>,
+    pub struct BrowserTree {
+        pub label: String,
+        pub children: Vec<NodeType>,
     }
 
-    impl Default for Tree {
+    impl Default for BrowserTree {
         fn default() -> Self {
             Self { label: String::from("Default"), children: vec![] }
         }
     }
 
-    impl Tree {
+    impl BrowserTree {
         pub fn empty() -> Self {
             Self::default()
         }
 
-        pub fn update(&mut self, path: &PathBuf) -> Option<Self> {
-            let children = vec![];
+        pub fn update(&mut self, path_buffer: &PathBuf) -> Result<(), SomeError> {
+            info!("Updating BrowserTree with target at - {}", path_buffer.to_str().unwrap());
 
-            // todo - default label should be stored somewhere static so we can just take it from there instead
-            Some(Self { label: String::from(&self.label), children })
+            if path_buffer.is_dir() {
+                info!("Target is valid Directory");
+
+                self.label = String::from(path_buffer.file_name().unwrap().to_str().unwrap()); // todo, better error handling here
+
+                let directory_node =
+                    DirectoryNode::new(String::from(&self.label), path_buffer.to_owned());
+
+                info!(
+                    "Adding new Tree Root. Label({}) Path({})",
+                    self.label,
+                    path_buffer.to_str().unwrap()
+                );
+                self.children.push(NodeType::Directory(directory_node));
+
+                return Ok(());
+            }
+            Err(SomeError {})
         }
     }
 
-    #[derive(Debug, Clone)]
-    pub struct RootNode {}
-
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Lens, Data)]
     pub struct FileNode {}
 
-    #[derive(Debug, Clone)]
-    pub struct DirectoryNode {}
-    impl RootNode {
-        pub fn new() -> Self {
-            Self {}
-        }
+    #[derive(Debug, Clone, Lens, Data)]
+    pub struct DirectoryNode {
+        pub label: String,
+        pub path: PathBuf,
+        pub children: Vec<NodeType>,
     }
+
     impl FileNode {
         pub fn new() -> Self {
             Self {}
         }
     }
     impl DirectoryNode {
-        pub fn new() -> Self {
-            Self {}
+        pub fn new(label: String, path: PathBuf) -> Self {
+            Self { label, path, children: vec![] }
+        }
+
+        pub fn recursive_scan(mut self) -> Result<NodeType, SomeError> {
+            if self.path.is_dir() {
+                //     info!("Directory found: {}", self.path.to_str().unwrap());
+
+                for child in std::fs::read_dir(self.path)? {
+                    let entry = child?;
+                    let path = entry.path();
+
+                    if path.is_dir() {
+                        info!("Directory found: {}", path.to_str().unwrap());
+                        let directory_node = DirectoryNode::new(
+                            String::from(path.file_name().unwrap().to_str().unwrap()), //todo better error handlilng
+                            path,
+                        );
+
+                        self.children.push(directory_node.recursive_scan()?);
+                    } else {
+                        info!("File found: {}", path.to_str().unwrap());
+                        self.children.push(NodeType::File(FileNode::new()));
+                    }
+                }
+
+                // }
+                // Err(SomeError {}) // todo error handling, scanning something which is not a directory or file.
+            }
+            Ok(NodeType::None)
+        }
+
+        pub fn scan(mut self) -> Result<NodeType, SomeError> {
+            if self.path.is_dir() {
+                //     info!("Directory found: {}", self.path.to_str().unwrap());
+
+                for child in std::fs::read_dir(self.path)? {
+                    let entry = child?;
+                    let path = entry.path();
+
+                    if path.is_dir() {
+                        info!("Directory found: {}", path.to_str().unwrap());
+                        let directory_node = DirectoryNode::new(
+                            String::from(path.file_name().unwrap().to_str().unwrap()), //todo better error handlilng
+                            path,
+                        );
+
+                        self.children.push(NodeType::Directory(directory_node));
+                    } else {
+                        info!("File found: {}", path.to_str().unwrap());
+                        self.children.push(NodeType::File(FileNode::new()));
+                    }
+                }
+
+                // }
+                // Err(SomeError {}) // todo error handling, scanning something which is not a directory or file.
+            }
+            Ok(NodeType::None)
         }
     }
 }
-
 #[derive(Debug, Clone, Data, Lens)]
 pub struct BrowserNode {
     pub name: String,
@@ -111,7 +189,7 @@ impl Default for BrowserNode {
 impl Default for BrowserState {
     fn default() -> Self {
         Self {
-            tree: Tree::empty(),
+            tree: BrowserTree::empty(),
             selected: Some(PathBuf::from("assets/test_files")),
             search_expression: String::from("..."),
         }
@@ -128,9 +206,7 @@ impl Model for BrowserState {
 
             // Set the new root from where the browser build the file view
             BrowserEvent::SetRoot(path) => {
-                if let Some(root_node) = self.tree.update(path) {
-                    self.tree = root_node;
-                }
+                self.tree.update(path).expect("Failed to update Root"); //todo better error handling here
             }
 
             // Play the selected file

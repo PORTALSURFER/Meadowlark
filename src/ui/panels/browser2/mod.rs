@@ -1,10 +1,32 @@
 use std::default;
 
-use crate::ui::browser_node_tree::*;
+use crate::ui::{browser_state::*, state};
 
-use crate::ui::state::{BrowserEvent, BrowserNode, BrowserState, PanelEvent, PanelState};
+use crate::ui::state::{BrowserEvent, BrowserState, PanelEvent, PanelState};
 use crate::ui::{Panel, ResizableStack, UiData, UiState};
+use log::info;
 use vizia::prelude::*;
+
+pub mod browser_widgets {
+    // todo better structure please, ffs boyyyy
+
+    use vizia::{prelude::Context, views::Label};
+
+    use crate::ui::browser_state::{self, DirectoryNode, NodeType};
+
+    pub struct File {}
+
+    impl File {}
+
+    pub struct Directory {}
+
+    impl Directory {
+        pub fn new(cx: &mut Context, node: DirectoryNode) {
+            let label = format!("{}", node.label);
+            Label::new(cx, &label);
+        }
+    }
+}
 
 struct Header {}
 impl Default for Header {
@@ -102,11 +124,13 @@ impl NodeView {
     }
 }
 
-struct FileView {}
+struct FileView {
+    root_node: state::browser_state::BrowserTree, // todo long name broooooo
+}
 
 impl Default for FileView {
     fn default() -> Self {
-        Self {}
+        Self { root_node: BrowserTree::empty() } // todo long name broooooo
     }
 }
 
@@ -115,13 +139,11 @@ impl FileView {
         Self::default()
     }
 
-    fn build(&self, cx: &mut Context) {
-        // todo test code
-        let root_node = NodeType::Root(RootNode::new());
-        let file_node = NodeType::File(FileNode::new());
-        let directory_node = NodeType::Directory(DirectoryNode::new());
-
-        // todo end of test code
+    fn build<L>(&self, cx: &mut Context, root_node: L)
+    where
+        L: Lens<Target = BrowserTree>, // todo long name broooooo
+        L::Source: Model,
+    {
         Panel::new(
             cx,
             |cx| {
@@ -131,20 +153,36 @@ impl FileView {
                 // menu to adjust the file view
                 // todo - should be elsewhere
                 FileViewMenu::new().build(cx);
-                ScrollView::new(cx, 0.0, 0.0, false, false, |cx| {
-                    VStack::new(cx, |cx| {
-                        NodeView::new(root_node).build(cx);
-                        NodeView::new(file_node).build(cx);
-                        NodeView::new(directory_node).build(cx);
-                    })
-                    .height(Auto);
-                })
-                .class("level3");
+                ScrollView::new(cx, 0.0, 0.0, false, false, move |cx| {
+                    Binding::new(
+                        cx,
+                        root_node.clone().then(BrowserTree::children),
+                        move |cx, children| {
+                            VStack::new(cx, |cx| {
+                                List::new(cx, children, move |cx, index, item| {
+                                    let item = item.clone().get(cx);
+                                    info!("list element {:?} {:?}", item, index);
+                                    match item {
+                                        NodeType::File(file) => {
+                                            Label::new(cx, "FILE");
+                                        }
+                                        NodeType::Directory(directory) => {
+                                            browser_widgets::Directory::new(cx, directory);
+                                        }
+                                        NodeType::None => {
+                                            Label::new(cx, "NONE");
+                                        }
+                                    };
+                                })
+                                .height(Auto);
+                            })
+                            .height(Auto);
+                        },
+                    );
+                });
             },
         )
-        .display(
-            UiData::state.then(UiState::panels.then(PanelState::hide_browser.map(|flag| !flag))),
-        );
+        .class("level3");
     }
 }
 
@@ -170,7 +208,8 @@ impl FileViewPanel {
             },
             |cx| {
                 // The actual browser panel
-                FileView::new().build(cx);
+                FileView::new()
+                    .build(cx, UiData::state.then(UiState::browser.then(BrowserState::tree)));
             },
         )
         .class("browser")
