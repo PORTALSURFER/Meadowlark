@@ -24,7 +24,7 @@ pub mod browser_widgets {
     };
 
     use crate::ui::{
-        browser_state::{self, DirectoryNode, NodeType},
+        browser_state::{self, DirectoryNode, DirectoryNodeEvent, NodeEvent, NodeType},
         BrowserEvent,
     };
 
@@ -60,8 +60,8 @@ pub mod browser_widgets {
             .cursor(CursorIcon::Hand)
             .on_press(move |cx| {
                 cx.focus();
-                //cx.emit(NodeEvent::SetSelected(NodeType::Directory(node.clone())));
-                cx.emit(BrowserEvent::ToggleOpen);
+                cx.emit(NodeEvent::SetSelected);
+                cx.emit(DirectoryNodeEvent::ToggleOpen);
             })
             .col_between(Pixels(4.0))
             .child_left(Pixels(15.0 * 0 as f32 + 5.0));

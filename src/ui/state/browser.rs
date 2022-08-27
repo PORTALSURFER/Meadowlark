@@ -37,17 +37,33 @@ pub mod browser_state {
     //todo this is a mess, needs more logical structure
     use log::info;
     use std::{fs::File, io::Error, path::PathBuf};
-    use vizia::prelude::{Data, Lens};
+    use vizia::{
+        prelude::{Data, Event, EventContext, Lens},
+        state::Model,
+        tree::Tree,
+    };
 
     use super::SomeError;
 
-    pub enum NodeEvent {}
+    pub enum NodeEvent {
+        SetSelected,
+    }
 
     #[derive(Debug, Clone, Lens, Data)]
     pub struct TreeNode {
         pub label: String,
         pub node_type: NodeType,
         pub is_selected: bool,
+    }
+    impl Model for TreeNode {
+        fn event(&mut self, cx: &mut EventContext, event: &mut Event) {
+            event.map(|node_event, _| match node_event {
+                NodeEvent::SetSelected => {
+                    info!("Set Selected");
+                    self.is_selected = true;
+                }
+            });
+        }
     }
 
     #[derive(Debug, Clone, Lens, Data)]
@@ -105,6 +121,10 @@ pub mod browser_state {
     #[derive(Debug, Clone, Lens, Data)]
     pub struct FileNode {}
 
+    pub enum DirectoryNodeEvent {
+        ToggleOpen,
+    }
+
     #[derive(Debug, Clone, Lens, Data)]
     pub struct DirectoryNode {
         pub label: String,
@@ -112,6 +132,17 @@ pub mod browser_state {
         pub children: Vec<NodeType>,
         pub is_open: bool,
         pub set_selected: bool,
+    }
+
+    impl Model for DirectoryNode {
+        fn event(&mut self, cx: &mut EventContext, event: &mut Event) {
+            event.map(|directory_node_event, _| match directory_node_event {
+                DirectoryNodeEvent::ToggleOpen => {
+                    info!("Toggle Open");
+                    self.is_open = !self.is_open;
+                }
+            });
+        }
     }
 
     impl FileNode {
