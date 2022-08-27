@@ -5,7 +5,6 @@ use crate::ui::icons::IconCode;
 pub struct Icon {}
 
 impl Icon {
-    // Creates an Icon with a set size for the outer frame and the icon.
     pub fn new<'a>(
         cx: &'a mut Context,
         icon: IconCode,

@@ -91,11 +91,11 @@ pub enum MeterScale {
 /// ```
 #[derive(Lens)]
 pub struct Meter {
-    /// The position of the meter bar in [0,1]
+    /// The position of the meter bar in \[0,1\]
     pos: f32,
     /// The scale that is used to map the input to the meter
     scale: MeterScale,
-    /// The position of the max peak in [0,1]
+    /// The position of the max peak in \[0,1\]
     max: f32,
     /// A ticker to keep track of when the max peak should start dropping
     max_delay_ticker: i32,

@@ -79,7 +79,8 @@ pub fn run_ui() -> Result<(), Box<dyn Error>> {
             .class("menu_bar");
             top_bar(cx);
             HStack::new(cx, |cx| {
-                browser(cx);
+                browser2::Browser::new().build(cx);
+
                 channels(cx);
                 VStack::new(cx, |cx| {
                     timeline(cx);

@@ -10,6 +10,9 @@ pub use left_bar::*;
 pub mod browser;
 pub use browser::*;
 
+pub mod browser2;
+pub use browser2::*;
+
 pub mod channels;
 pub use channels::*;
 
