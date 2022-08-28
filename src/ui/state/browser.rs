@@ -40,7 +40,6 @@ pub mod browser_state {
     use vizia::{
         prelude::{Data, Event, EventContext, Lens},
         state::Model,
-        tree::Tree,
     };
 
     use super::SomeError;
@@ -55,6 +54,7 @@ pub mod browser_state {
         pub node_type: NodeType,
         pub is_selected: bool,
     }
+
     impl Model for TreeNode {
         fn event(&mut self, cx: &mut EventContext, event: &mut Event) {
             event.map(|node_event, _| match node_event {
@@ -131,7 +131,6 @@ pub mod browser_state {
         pub path: PathBuf,
         pub children: Vec<NodeType>,
         pub is_open: bool,
-        pub set_selected: bool,
     }
 
     impl Model for DirectoryNode {
@@ -140,6 +139,7 @@ pub mod browser_state {
                 DirectoryNodeEvent::ToggleOpen => {
                     info!("Toggle Open");
                     self.is_open = !self.is_open;
+                    info!("{}", self.is_open);
                 }
             });
         }
@@ -152,7 +152,7 @@ pub mod browser_state {
     }
     impl DirectoryNode {
         pub fn new(label: String, path: PathBuf) -> Self {
-            Self { label, path, children: vec![], is_open: false, set_selected: false }
+            Self { label, path, children: vec![], is_open: false }
         }
 
         pub fn recursive_scan(mut self) -> Result<NodeType, SomeError> {

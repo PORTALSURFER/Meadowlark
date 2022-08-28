@@ -18,13 +18,13 @@ pub mod browser_widgets {
             Actions, Context, Lens,
             Units::{Pixels, Stretch},
         },
-        state::LensExt,
+        state::{Binding, LensExt, Model},
         views::{HStack, Label},
         window::CursorIcon,
     };
 
     use crate::ui::{
-        browser_state::{self, DirectoryNode, DirectoryNodeEvent, NodeEvent, NodeType},
+        browser_state::{self, DirectoryNode, DirectoryNodeEvent, NodeEvent, NodeType, TreeNode},
         BrowserEvent,
     };
 
@@ -35,36 +35,38 @@ pub mod browser_widgets {
     pub struct Directory {}
 
     impl Directory {
-        pub fn new(cx: &mut Context, node: DirectoryNode) {
-            info!("Draw Directory UI Element");
+        pub fn new<L>(cx: &mut Context, node: L)
+        where
+            L: Lens<Target = DirectoryNode>,
+            L::Source: Model,
+        {
+            Binding::new(cx, node.clone().then(DirectoryNode::is_open), move |cx, is_open| {
+                let label = format!("{}", node.get(cx).label);
+                info!("Trigger Directory Binding");
 
-            let label = format!("{}", node.label);
+                let is_open = is_open.clone();
 
-            HStack::new(cx, |cx| {
-                let rotation = match node.is_open {
-                    true => 0.0,
-                    false => -90.0,
-                };
+                HStack::new(cx, |cx| {
+                    Label::new(cx, "\u{e75c}")
+                        .font("icon")
+                        .height(Stretch(1.0))
+                        .child_top(Stretch(1.0))
+                        .child_bottom(Stretch(1.0))
+                        .hoverable(false)
+                        .rotate(is_open.map(|flag| if *flag { 0.0 } else { -90.0 }));
 
-                Label::new(cx, "\u{e75c}")
-                    .font("icon")
-                    .height(Stretch(1.0))
-                    .child_top(Stretch(1.0))
-                    .child_bottom(Stretch(1.0))
-                    .hoverable(false)
-                    .rotate(rotation);
-
-                // File or directory name
-                Label::new(cx, &label).width(Stretch(1.0)).text_wrap(false).hoverable(false);
-            })
-            .cursor(CursorIcon::Hand)
-            .on_press(move |cx| {
-                cx.focus();
-                cx.emit(NodeEvent::SetSelected);
-                cx.emit(DirectoryNodeEvent::ToggleOpen);
-            })
-            .col_between(Pixels(4.0))
-            .child_left(Pixels(15.0 * 0 as f32 + 5.0));
+                    // File or directory name
+                    Label::new(cx, &label).width(Stretch(1.0)).text_wrap(false).hoverable(false);
+                })
+                .cursor(CursorIcon::Hand)
+                .on_press(move |cx| {
+                    cx.focus();
+                    cx.emit(NodeEvent::SetSelected);
+                    cx.emit(DirectoryNodeEvent::ToggleOpen);
+                })
+                .col_between(Pixels(4.0))
+                .child_left(Pixels(15.0 * 0 as f32 + 5.0));
+            });
         }
     }
 }
@@ -199,17 +201,33 @@ impl FileView {
                         cx,
                         root_node.clone().then(BrowserTree::children),
                         move |cx, children| {
+                            info!("FileView building..");
+
                             VStack::new(cx, |cx| {
                                 List::new(cx, children, move |cx, index, item| {
-                                    let node = item.clone().get(cx);
+                                    let node = item.clone();
+                                    node.get(cx).build(cx);
 
-                                    info!("list element {:?} {:?}", node, index);
-                                    match node.node_type {
+                                    info!("list element {} {}", node.get(cx).label, index);
+
+                                    match node.get(cx).node_type {
                                         NodeType::File(file) => {
                                             Label::new(cx, "FILE");
                                         }
+
                                         NodeType::Directory(directory) => {
-                                            browser_widgets::Directory::new(cx, directory);
+                                            node.clone()
+                                                .then(TreeNode::node_type)
+                                                .then(NodeType::directory)
+                                                .get(cx)
+                                                .build(cx); // todo register for events thing, can this be better?
+
+                                            browser_widgets::Directory::new(
+                                                cx,
+                                                node.clone()
+                                                    .then(TreeNode::node_type)
+                                                    .then(NodeType::directory),
+                                            );
                                         }
                                         NodeType::None => {
                                             Label::new(cx, "NONE");
