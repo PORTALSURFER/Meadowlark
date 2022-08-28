@@ -38,8 +38,8 @@ pub mod browser_state {
     use log::info;
     use std::{fs::File, io::Error, path::PathBuf};
     use vizia::{
-        prelude::{Data, Event, EventContext, Lens},
-        state::Model,
+        prelude::{Context, Data, Event, EventContext, Lens},
+        state::{Binding, Model},
     };
 
     use super::SomeError;
@@ -137,7 +137,7 @@ pub mod browser_state {
         fn event(&mut self, cx: &mut EventContext, event: &mut Event) {
             event.map(|directory_node_event, _| match directory_node_event {
                 DirectoryNodeEvent::ToggleOpen => {
-                    info!("Toggle Open");
+                    info!("Toggle Open ({})", self.label);
                     self.is_open = !self.is_open;
                     info!("{}", self.is_open);
                 }

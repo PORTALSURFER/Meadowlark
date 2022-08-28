@@ -197,48 +197,46 @@ impl FileView {
                 // todo - should be elsewhere
                 FileViewMenu::new().build(cx);
                 ScrollView::new(cx, 0.0, 0.0, false, false, move |cx| {
-                    Binding::new(
-                        cx,
-                        root_node.clone().then(BrowserTree::children),
-                        move |cx, children| {
-                            info!("FileView building..");
+                    Binding::new(cx, root_node.then(BrowserTree::children), move |cx, children| {
+                        info!("FileView building..");
 
-                            VStack::new(cx, |cx| {
-                                List::new(cx, children, move |cx, index, item| {
-                                    let node = item.clone();
-                                    node.get(cx).build(cx);
+                        VStack::new(cx, |cx| {
+                            List::new(cx, children, move |cx, index, item| {
+                                let node = item.clone();
+                                node.get(cx).build(cx);
 
-                                    info!("list element {} {}", node.get(cx).label, index);
+                                info!("list element {} {}", node.get(cx).label, index);
 
-                                    match node.get(cx).node_type {
-                                        NodeType::File(file) => {
-                                            Label::new(cx, "FILE");
-                                        }
+                                node.get(cx).build(cx);
 
-                                        NodeType::Directory(directory) => {
+                                match node.get(cx).node_type {
+                                    NodeType::File(file) => {
+                                        Label::new(cx, "FILE");
+                                    }
+
+                                    NodeType::Directory(directory) => {
+                                        node.clone()
+                                            .then(TreeNode::node_type)
+                                            .then(NodeType::directory)
+                                            .get(cx)
+                                            .build(cx);
+
+                                        browser_widgets::Directory::new(
+                                            cx,
                                             node.clone()
                                                 .then(TreeNode::node_type)
-                                                .then(NodeType::directory)
-                                                .get(cx)
-                                                .build(cx); // todo register for events thing, can this be better?
-
-                                            browser_widgets::Directory::new(
-                                                cx,
-                                                node.clone()
-                                                    .then(TreeNode::node_type)
-                                                    .then(NodeType::directory),
-                                            );
-                                        }
-                                        NodeType::None => {
-                                            Label::new(cx, "NONE");
-                                        }
-                                    };
-                                })
-                                .height(Auto);
+                                                .then(NodeType::directory),
+                                        );
+                                    }
+                                    NodeType::None => {
+                                        Label::new(cx, "NONE");
+                                    }
+                                };
                             })
                             .height(Auto);
-                        },
-                    );
+                        })
+                        .height(Auto);
+                    });
                 });
             },
         )
