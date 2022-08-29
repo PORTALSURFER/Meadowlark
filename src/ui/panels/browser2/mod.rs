@@ -35,38 +35,34 @@ pub mod browser_widgets {
     pub struct Directory {}
 
     impl Directory {
-        pub fn new<L>(cx: &mut Context, node: L)
-        where
-            L: Lens<Target = DirectoryNode>,
-            L::Source: Model,
-        {
-            Binding::new(cx, node.clone().then(DirectoryNode::is_open), move |cx, is_open| {
-                let label = format!("{}", node.get(cx).label);
-                info!("Trigger Directory Binding");
+        pub fn new(cx: &mut Context, node: &DirectoryNode) {
+            // Binding::new(cx, node.clone().then(DirectoryNode::is_open), move |cx, is_open| {
+            let label = format!("{}", node.label);
+            info!("Trigger Directory Binding");
 
-                let is_open = is_open.clone();
+            let is_open = node.is_open;
 
-                HStack::new(cx, |cx| {
-                    Label::new(cx, "\u{e75c}")
-                        .font("icon")
-                        .height(Stretch(1.0))
-                        .child_top(Stretch(1.0))
-                        .child_bottom(Stretch(1.0))
-                        .hoverable(false)
-                        .rotate(is_open.map(|flag| if *flag { 0.0 } else { -90.0 }));
+            HStack::new(cx, |cx| {
+                Label::new(cx, "\u{e75c}")
+                    .font("icon")
+                    .height(Stretch(1.0))
+                    .child_top(Stretch(1.0))
+                    .child_bottom(Stretch(1.0))
+                    .hoverable(false)
+                    .rotate(-90.0);
 
-                    // File or directory name
-                    Label::new(cx, &label).width(Stretch(1.0)).text_wrap(false).hoverable(false);
-                })
-                .cursor(CursorIcon::Hand)
-                .on_press(move |cx| {
-                    cx.focus();
-                    cx.emit(NodeEvent::SetSelected);
-                    cx.emit(DirectoryNodeEvent::ToggleOpen);
-                })
-                .col_between(Pixels(4.0))
-                .child_left(Pixels(15.0 * 0 as f32 + 5.0));
-            });
+                // File or directory name
+                Label::new(cx, &label).width(Stretch(1.0)).text_wrap(false).hoverable(false);
+            })
+            .cursor(CursorIcon::Hand)
+            .on_press(move |cx| {
+                cx.focus();
+                cx.emit(NodeEvent::SetSelected);
+                cx.emit(DirectoryNodeEvent::ToggleOpen);
+            })
+            .col_between(Pixels(4.0))
+            .child_left(Pixels(15.0 * 0 as f32 + 5.0));
+            // });
         }
     }
 }
@@ -83,7 +79,7 @@ impl Header {
         Self::default()
     }
 
-    fn build(self, cx: &mut Context) {
+    fn view(self, cx: &mut Context) {
         // Browser label
         Label::new(cx, "BROWSER").text_wrap(false).class("small");
     }
@@ -102,7 +98,7 @@ impl SideBar {
         Self::default()
     }
 
-    fn build(&self, cx: &mut Context) {
+    fn view(&self, cx: &mut Context) {
         VStack::new(cx, |cx| {
             Element::new(cx).class("level4").size(Pixels(32.0)).bottom(Pixels(1.0));
 
@@ -132,7 +128,7 @@ impl FileViewMenu {
         Self::default()
     }
 
-    fn build(self, cx: &mut Context) {
+    fn view(self, cx: &mut Context) {
         // Button to set a new root_node (Target Folder)
         Label::new(cx, "SET ROOT").on_release(|cx| {
             if let Some(folder_path) = rfd::FileDialog::new().pick_folder() {
@@ -182,7 +178,7 @@ impl FileView {
         Self::default()
     }
 
-    fn build<L>(&self, cx: &mut Context, root_node: L)
+    fn view<L>(&self, cx: &mut Context, root_node: L)
     where
         L: Lens<Target = BrowserTree>, // todo long name broooooo
         L::Source: Model,
@@ -190,24 +186,33 @@ impl FileView {
         Panel::new(
             cx,
             |cx| {
-                Header::new().build(cx);
+                Header::new().view(cx);
             },
             |cx| {
                 // menu to adjust the file view
                 // todo - should be elsewhere
-                FileViewMenu::new().build(cx);
+                FileViewMenu::new().view(cx);
                 ScrollView::new(cx, 0.0, 0.0, false, false, move |cx| {
-                    Binding::new(cx, root_node.then(BrowserTree::children), move |cx, children| {
+                    Binding::new(cx, root_node, move |cx, node| {
+                        Label::new(cx, &node.get(cx).label);
+
+                        let children = node.then(BrowserTree::children);
                         info!("FileView building..");
 
                         VStack::new(cx, |cx| {
                             List::new(cx, children, move |cx, index, item| {
                                 let node = item.clone();
-                                node.get(cx).build(cx);
+
+                                // node.get(cx).build(cx);
 
                                 info!("list element {} {}", node.get(cx).label, index);
 
-                                node.get(cx).build(cx);
+                                //node.get(cx).build(cx);
+
+                                Label::new(cx, "CLICK ME").on_press(move |cx| {
+                                    //cx.focus();
+                                    cx.emit(BrowserTreeEvent::Clicked)
+                                });
 
                                 match node.get(cx).node_type {
                                     NodeType::File(file) => {
@@ -215,18 +220,12 @@ impl FileView {
                                     }
 
                                     NodeType::Directory(directory) => {
-                                        node.clone()
-                                            .then(TreeNode::node_type)
+                                        node.then(TreeNode::node_type)
                                             .then(NodeType::directory)
                                             .get(cx)
                                             .build(cx);
 
-                                        browser_widgets::Directory::new(
-                                            cx,
-                                            node.clone()
-                                                .then(TreeNode::node_type)
-                                                .then(NodeType::directory),
-                                        );
+                                        browser_widgets::Directory::new(cx, &directory);
                                     }
                                     NodeType::None => {
                                         Label::new(cx, "NONE");
@@ -257,7 +256,7 @@ impl FileViewPanel {
         Self::default()
     }
 
-    fn build(self, cx: &mut Context) {
+    fn view(self, cx: &mut Context) {
         ResizableStack::new(
             cx,
             UiData::state.then(UiState::panels.then(PanelState::browser_width)),
@@ -266,8 +265,10 @@ impl FileViewPanel {
             },
             |cx| {
                 // The actual browser panel
-                FileView::new()
-                    .build(cx, UiData::state.then(UiState::browser.then(BrowserState::tree)));
+
+                let browser_tree = UiData::state.then(UiState::browser.then(BrowserState::tree));
+                browser_tree.get(cx).build(cx);
+                FileView::new().view(cx, browser_tree);
             },
         )
         .class("browser")
@@ -288,10 +289,10 @@ impl Browser {
         Self::default()
     }
 
-    pub fn build(self, cx: &mut Context) {
+    pub fn view(self, cx: &mut Context) {
         HStack::new(cx, |cx| {
-            SideBar::new().build(cx);
-            FileViewPanel::new().build(cx);
+            SideBar::new().view(cx);
+            FileViewPanel::new().view(cx);
         })
         .width(Auto)
         .class("level1");

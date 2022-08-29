@@ -48,6 +48,9 @@ pub mod browser_state {
         SetSelected,
     }
 
+    pub enum BrowserTreeEvent {
+        Clicked,
+    }
     #[derive(Debug, Clone, Lens, Data)]
     pub struct TreeNode {
         pub label: String,
@@ -73,7 +76,7 @@ pub mod browser_state {
         None,
     }
 
-    #[derive(Debug, Clone, Lens)]
+    #[derive(Debug, Clone, Lens, Data)]
     pub struct BrowserTree {
         pub label: String,
         pub children: Vec<TreeNode>,
@@ -82,6 +85,18 @@ pub mod browser_state {
     impl Default for BrowserTree {
         fn default() -> Self {
             Self { label: String::from("Default"), children: vec![] }
+        }
+    }
+
+    impl Model for BrowserTree {
+        fn event(&mut self, cx: &mut EventContext, event: &mut Event) {
+            event.map(|node_event, _| match node_event {
+                BrowserTreeEvent::Clicked => {
+                    info!("Clicked");
+
+                    self.label = String::from("BOB");
+                }
+            });
         }
     }
 
@@ -111,7 +126,6 @@ pub mod browser_state {
                     TreeNode::new(String::from(&self.label), NodeType::Directory(directory_node));
 
                 self.children.push(node);
-
                 return Ok(());
             }
             Err(SomeError {})
