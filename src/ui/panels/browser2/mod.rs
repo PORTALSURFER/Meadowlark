@@ -37,6 +37,7 @@ pub mod browser_widgets {
 
     impl Directory {
         pub fn new<L>(cx: &mut Context, node: L)
+        //todo rename to view? have new build something else here? this is weird.
         where
             L: Lens<Target = DirectoryNode>,
             L::Source: Model,
@@ -69,15 +70,22 @@ pub mod browser_widgets {
                 .child_left(Pixels(15.0 * 0 as f32 + 5.0));
 
                 if node.get(cx).is_open {
-                    List::new(cx, node.then(DirectoryNode::children), |cx, index, item| {
-                        let test = item.then(TreeNode::node_type);
-
-                        // match test {
-                        //     NodeType::Directory(_) => {}
-                        //     NodeType::File(_) => todo!(),
-                        //     NodeType::None => todo!(),
-                        // }
-                        NodeView::new().view(cx, test);
+                    List::new(cx, node.then(DirectoryNode::children), |cx, index, node| {
+                        match node.get(cx).node_type {
+                            NodeType::File(file) => {
+                                Label::new(cx, "FILE");
+                            }
+                            NodeType::Directory(_) => {
+                                let node = node.then(TreeNode::node_type).then(NodeType::directory);
+                                //Directory::new(cx, node);
+                                Label::new(cx, "DIRECTORY");
+                                //NodeView::new().view(cx, node);
+                            }
+                            NodeType::None => {
+                                Label::new(cx, "NONE");
+                            }
+                        };
+                        //              NodeView::new().view(cx, node);
                     });
                 }
             });
@@ -178,16 +186,17 @@ impl NodeView {
 
     fn view<L>(&self, cx: &mut Context, node: L)
     where
-        L: Lens<Target = NodeType>,
+        L: Lens<Target = TreeNode>,
         L::Source: Model,
     {
-        match node.get(cx) {
+        match node.get(cx).node_type {
             NodeType::File(file) => {
                 Label::new(cx, "FILE");
             }
 
-            NodeType::Directory(directory) => {
-                let node = node.then(NodeType::directory);
+            NodeType::Directory(_) => {
+                let node = node.then(TreeNode::node_type).then(NodeType::directory);
+                //Label::new(cx, "DIRECTORY");
                 browser_widgets::Directory::new(cx, node);
             }
             NodeType::None => {
@@ -230,13 +239,12 @@ impl FileView {
                 ScrollView::new(cx, 0.0, 0.0, false, false, move |cx| {
                     Binding::new(cx, root_node, move |cx, node| {
                         info!("FileView building..");
-
                         let children = node.then(BrowserTree::children);
                         VStack::new(cx, |cx| {
-                            List::new(cx, children, move |cx, index, item| {
-                                info!("list element {} {}", item.clone().get(cx).label, index);
-                                let node_type = item.then(TreeNode::node_type);
-                                NodeView::new().view(cx, node_type);
+                            List::new(cx, children, move |cx, index, node| {
+                                info!("ROOT:({}) IDX:({})", node.clone().get(cx).label, index);
+                                let node = node;
+                                NodeView::new().view(cx, node);
                             })
                             .height(Auto);
                         })

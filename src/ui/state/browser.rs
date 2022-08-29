@@ -164,10 +164,14 @@ pub mod browser_state {
             event.map(|directory_node_event, _| match directory_node_event {
                 DirectoryNodeEvent::ToggleOpen => {
                     info!("Toggle Open ({})", self.label);
-
-                    self.scan().expect("failed scan folder"); //todo better error handling
-
                     self.is_open = !self.is_open;
+
+                    if self.is_open {
+                        self.scan().expect("failed scan folder"); //todo better error handling
+                    } else {
+                        self.children.clear(); // todo, all this should update if needed.
+                    }
+
                     info!("{}", self.is_open);
                 }
             });
@@ -215,34 +219,32 @@ pub mod browser_state {
         // }
 
         pub fn scan(&mut self) -> Result<(), SomeError> {
-            // if self.path.is_dir() {
-            //     //     info!("Directory found: {}", self.path.to_str().unwrap());
+            if self.path.is_dir() {
+                //     info!("Directory found: {}", self.path.to_str().unwrap());
 
-            //     for child in std::fs::read_dir(&self.path)? {
-            //         let entry = child?;
-            //         let path = entry.path();
+                for child in std::fs::read_dir(&self.path)? {
+                    let entry = child?;
+                    let path = entry.path();
 
-            //         if path.is_dir() {
-            //             let label = String::from(path.to_str().unwrap());
-            //             info!("Directory found: {}", &label);
-            //             let directory_node = DirectoryNode::new(
-            //                 String::from(path.file_name().unwrap().to_str().unwrap()), //todo better error handlilng
-            //                 path,
-            //             );
+                    if path.is_dir() {
+                        let label = String::from(path.to_str().unwrap());
+                        info!("Directory found: {}", &label);
+                        let directory_node = DirectoryNode::new(
+                            String::from(path.file_name().unwrap().to_str().unwrap()), //todo better error handlilng
+                            path,
+                        );
 
-            //             let node = TreeNode::new(label, NodeType::Directory(directory_node));
-            //             self.children.push(node);
-            //         } else {
-            //             let label = String::from(path.to_str().unwrap());
-            //             info!("File found: {}", &label);
-            //             let node = TreeNode::new(label, NodeType::File(FileNode::new()));
-            //             self.children.push(node);
-            //         }
-            //     }
-
-            //     // }
-            //     // Err(SomeError {}) // todo error handling, scanning something which is not a directory or file.
-            // }
+                        let node = TreeNode::new(label, NodeType::Directory(directory_node));
+                        self.children.push(node);
+                    } else {
+                        let label = String::from(path.to_str().unwrap());
+                        info!("File found: {}", &label);
+                        let node = TreeNode::new(label, NodeType::File(FileNode::new()));
+                        self.children.push(node);
+                    }
+                }
+                // Err(SomeError {}) // todo error handling, scanning something which is not a directory or file.
+            }
             Ok(())
         }
     }
