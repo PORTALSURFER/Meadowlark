@@ -2,13 +2,13 @@ use std::path::{Path, PathBuf};
 
 use self::browser_state::{BrowserTree, DirectoryNode, NodeType};
 
-use super::UiEvent;
+use super::{event, UiEvent};
 use log::info;
 use vizia::prelude::*;
 
 #[derive(Debug, Clone, Lens)]
 pub struct BrowserState {
-    pub tree: BrowserTree,
+    pub browser_tree: BrowserTree,
     pub selected: NodeType,
     pub search_expression: String,
 }
@@ -66,6 +66,14 @@ pub mod browser_state {
                     self.is_selected = true;
                 }
             });
+
+            match &mut self.node_type {
+                NodeType::File(file) => {
+                    todo!()
+                }
+                NodeType::Directory(directory) => directory.event(cx, event),
+                NodeType::None => {}
+            }
         }
     }
 
@@ -97,6 +105,10 @@ pub mod browser_state {
                     self.label = String::from("BOB");
                 }
             });
+
+            for child in &mut self.children {
+                child.event(cx, event);
+            }
         }
     }
 
@@ -143,7 +155,7 @@ pub mod browser_state {
     pub struct DirectoryNode {
         pub label: String,
         pub path: PathBuf,
-        pub children: Vec<NodeType>,
+        pub children: Vec<TreeNode>,
         pub is_open: bool,
     }
 
@@ -152,6 +164,9 @@ pub mod browser_state {
             event.map(|directory_node_event, _| match directory_node_event {
                 DirectoryNodeEvent::ToggleOpen => {
                     info!("Toggle Open ({})", self.label);
+
+                    self.scan().expect("failed scan folder"); //todo better error handling
+
                     self.is_open = !self.is_open;
                     info!("{}", self.is_open);
                 }
@@ -169,60 +184,66 @@ pub mod browser_state {
             Self { label, path, children: vec![], is_open: false }
         }
 
-        pub fn recursive_scan(mut self) -> Result<NodeType, SomeError> {
-            if self.path.is_dir() {
-                //     info!("Directory found: {}", self.path.to_str().unwrap());
+        // pub fn recursive_scan(&mut self) -> Result<TreeNode, SomeError> {
+        //     if self.path.is_dir() {
+        //         //     info!("Directory found: {}", self.path.to_str().unwrap());
 
-                for child in std::fs::read_dir(self.path)? {
-                    let entry = child?;
-                    let path = entry.path();
+        //         for child in std::fs::read_dir(&self.path)? {
+        //             let entry = child?;
+        //             let path = entry.path();
 
-                    if path.is_dir() {
-                        info!("Directory found: {}", path.to_str().unwrap());
-                        let directory_node = DirectoryNode::new(
-                            String::from(path.file_name().unwrap().to_str().unwrap()), //todo better error handlilng
-                            path,
-                        );
+        //             if path.is_dir() {
+        //                 info!("Directory found: {}", path.to_str().unwrap());
+        //                 let mut directory_node = DirectoryNode::new(
+        //                     String::from(path.file_name().unwrap().to_str().unwrap()), //todo better error handlilng
+        //                     path,
+        //                 );
 
-                        self.children.push(directory_node.recursive_scan()?);
-                    } else {
-                        info!("File found: {}", path.to_str().unwrap());
-                        self.children.push(NodeType::File(FileNode::new()));
-                    }
-                }
+        //                 self.children.push(directory_node.recursive_scan()?);
+        //             } else {
+        //                 let label = String::from(path.to_str().unwrap());
+        //                 info!("File found: {}", &label);
+        //                 let node = TreeNode::new(label, NodeType::File(FileNode::new()));
+        //                 self.children.push(node);
+        //             }
+        //         }
 
-                // }
-                // Err(SomeError {}) // todo error handling, scanning something which is not a directory or file.
-            }
-            Ok(NodeType::None)
-        }
+        //         // }
+        //         // Err(SomeError {}) // todo error handling, scanning something which is not a directory or file.
+        //     }
+        //     Ok(TreeNode::new(String::from("TEST"), NodeType::Directory(self)))
+        // }
 
-        pub fn scan(mut self) -> Result<NodeType, SomeError> {
-            if self.path.is_dir() {
-                //     info!("Directory found: {}", self.path.to_str().unwrap());
+        pub fn scan(&mut self) -> Result<(), SomeError> {
+            // if self.path.is_dir() {
+            //     //     info!("Directory found: {}", self.path.to_str().unwrap());
 
-                for child in std::fs::read_dir(self.path)? {
-                    let entry = child?;
-                    let path = entry.path();
+            //     for child in std::fs::read_dir(&self.path)? {
+            //         let entry = child?;
+            //         let path = entry.path();
 
-                    if path.is_dir() {
-                        info!("Directory found: {}", path.to_str().unwrap());
-                        let directory_node = DirectoryNode::new(
-                            String::from(path.file_name().unwrap().to_str().unwrap()), //todo better error handlilng
-                            path,
-                        );
+            //         if path.is_dir() {
+            //             let label = String::from(path.to_str().unwrap());
+            //             info!("Directory found: {}", &label);
+            //             let directory_node = DirectoryNode::new(
+            //                 String::from(path.file_name().unwrap().to_str().unwrap()), //todo better error handlilng
+            //                 path,
+            //             );
 
-                        self.children.push(NodeType::Directory(directory_node));
-                    } else {
-                        info!("File found: {}", path.to_str().unwrap());
-                        self.children.push(NodeType::File(FileNode::new()));
-                    }
-                }
+            //             let node = TreeNode::new(label, NodeType::Directory(directory_node));
+            //             self.children.push(node);
+            //         } else {
+            //             let label = String::from(path.to_str().unwrap());
+            //             info!("File found: {}", &label);
+            //             let node = TreeNode::new(label, NodeType::File(FileNode::new()));
+            //             self.children.push(node);
+            //         }
+            //     }
 
-                // }
-                // Err(SomeError {}) // todo error handling, scanning something which is not a directory or file.
-            }
-            Ok(NodeType::None)
+            //     // }
+            //     // Err(SomeError {}) // todo error handling, scanning something which is not a directory or file.
+            // }
+            Ok(())
         }
     }
     impl TreeNode {
@@ -235,7 +256,7 @@ pub mod browser_state {
 impl Default for BrowserState {
     fn default() -> Self {
         Self {
-            tree: BrowserTree::empty(),
+            browser_tree: BrowserTree::empty(),
             selected: NodeType::None,
             search_expression: String::from("..."),
         }
@@ -252,7 +273,7 @@ impl Model for BrowserState {
 
             // Set the new root from where the browser build the file view
             BrowserEvent::SetRoot(path) => {
-                self.tree.update(path).expect("Failed to update Root"); //todo better error handling here
+                self.browser_tree.update(path).expect("Failed to update Root"); //todo better error handling here
             }
 
             // Play the selected file
@@ -306,6 +327,8 @@ impl Model for BrowserState {
                 // }
             }
         });
+
+        self.browser_tree.event(cx, event);
     }
 }
 

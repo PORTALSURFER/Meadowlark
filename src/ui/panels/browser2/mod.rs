@@ -19,11 +19,12 @@ pub mod browser_widgets {
             Units::{Pixels, Stretch},
         },
         state::{Binding, LensExt, Model},
-        views::{HStack, Label},
+        views::{HStack, Label, List},
         window::CursorIcon,
     };
 
     use crate::ui::{
+        browser2::NodeView,
         browser_state::{self, DirectoryNode, DirectoryNodeEvent, NodeEvent, NodeType, TreeNode},
         BrowserEvent,
     };
@@ -35,34 +36,51 @@ pub mod browser_widgets {
     pub struct Directory {}
 
     impl Directory {
-        pub fn new(cx: &mut Context, node: &DirectoryNode) {
-            // Binding::new(cx, node.clone().then(DirectoryNode::is_open), move |cx, is_open| {
-            let label = format!("{}", node.label);
-            info!("Trigger Directory Binding");
+        pub fn new<L>(cx: &mut Context, node: L)
+        where
+            L: Lens<Target = DirectoryNode>,
+            L::Source: Model,
+        {
+            Binding::new(cx, node.clone(), move |cx, node| {
+                let label = format!("{}", node.get(cx).label);
+                info!("Trigger Directory Binding");
 
-            let is_open = node.is_open;
+                let is_open = node.clone().then(DirectoryNode::is_open);
 
-            HStack::new(cx, |cx| {
-                Label::new(cx, "\u{e75c}")
-                    .font("icon")
-                    .height(Stretch(1.0))
-                    .child_top(Stretch(1.0))
-                    .child_bottom(Stretch(1.0))
-                    .hoverable(false)
-                    .rotate(-90.0);
+                HStack::new(cx, |cx| {
+                    Label::new(cx, "\u{e75c}")
+                        .font("icon")
+                        .height(Stretch(1.0))
+                        .child_top(Stretch(1.0))
+                        .child_bottom(Stretch(1.0))
+                        .hoverable(false)
+                        .rotate(is_open.map(|b| if *b { 0.0 } else { -90.0 }));
 
-                // File or directory name
-                Label::new(cx, &label).width(Stretch(1.0)).text_wrap(false).hoverable(false);
-            })
-            .cursor(CursorIcon::Hand)
-            .on_press(move |cx| {
-                cx.focus();
-                cx.emit(NodeEvent::SetSelected);
-                cx.emit(DirectoryNodeEvent::ToggleOpen);
-            })
-            .col_between(Pixels(4.0))
-            .child_left(Pixels(15.0 * 0 as f32 + 5.0));
-            // });
+                    // File or directory name
+                    Label::new(cx, &label).width(Stretch(1.0)).text_wrap(false).hoverable(false);
+                })
+                .cursor(CursorIcon::Hand)
+                .on_press(move |cx| {
+                    cx.focus();
+                    cx.emit(NodeEvent::SetSelected);
+                    cx.emit(DirectoryNodeEvent::ToggleOpen);
+                })
+                .col_between(Pixels(4.0))
+                .child_left(Pixels(15.0 * 0 as f32 + 5.0));
+
+                if node.get(cx).is_open {
+                    List::new(cx, node.then(DirectoryNode::children), |cx, index, item| {
+                        let test = item.then(TreeNode::node_type);
+
+                        // match test {
+                        //     NodeType::Directory(_) => {}
+                        //     NodeType::File(_) => todo!(),
+                        //     NodeType::None => todo!(),
+                        // }
+                        NodeView::new().view(cx, test);
+                    });
+                }
+            });
         }
     }
 }
@@ -154,22 +172,38 @@ impl FileViewMenu {
 struct NodeView {}
 
 impl NodeView {
-    fn new(node_type: NodeType) -> Self {
+    fn new() -> Self {
         Self {}
     }
 
-    fn build(&self, cx: &mut Context) {
-        Label::new(cx, "NODE ITEM");
+    fn view<L>(&self, cx: &mut Context, node: L)
+    where
+        L: Lens<Target = NodeType>,
+        L::Source: Model,
+    {
+        match node.get(cx) {
+            NodeType::File(file) => {
+                Label::new(cx, "FILE");
+            }
+
+            NodeType::Directory(directory) => {
+                let node = node.then(NodeType::directory);
+                browser_widgets::Directory::new(cx, node);
+            }
+            NodeType::None => {
+                Label::new(cx, "NONE");
+            }
+        };
     }
 }
 
 struct FileView {
-    root_node: state::browser_state::BrowserTree, // todo long name broooooo
+    root_node: BrowserTree,
 }
 
 impl Default for FileView {
     fn default() -> Self {
-        Self { root_node: BrowserTree::empty() } // todo long name broooooo
+        Self { root_node: BrowserTree::empty() }
     }
 }
 
@@ -180,7 +214,7 @@ impl FileView {
 
     fn view<L>(&self, cx: &mut Context, root_node: L)
     where
-        L: Lens<Target = BrowserTree>, // todo long name broooooo
+        L: Lens<Target = BrowserTree>,
         L::Source: Model,
     {
         Panel::new(
@@ -190,47 +224,19 @@ impl FileView {
             },
             |cx| {
                 // menu to adjust the file view
-                // todo - should be elsewhere
+                // todo - should be elsewhere, file menu belongs in it's own little house
                 FileViewMenu::new().view(cx);
+
                 ScrollView::new(cx, 0.0, 0.0, false, false, move |cx| {
                     Binding::new(cx, root_node, move |cx, node| {
-                        Label::new(cx, &node.get(cx).label);
-
-                        let children = node.then(BrowserTree::children);
                         info!("FileView building..");
 
+                        let children = node.then(BrowserTree::children);
                         VStack::new(cx, |cx| {
                             List::new(cx, children, move |cx, index, item| {
-                                let node = item.clone();
-
-                                // node.get(cx).build(cx);
-
-                                info!("list element {} {}", node.get(cx).label, index);
-
-                                //node.get(cx).build(cx);
-
-                                Label::new(cx, "CLICK ME").on_press(move |cx| {
-                                    //cx.focus();
-                                    cx.emit(BrowserTreeEvent::Clicked)
-                                });
-
-                                match node.get(cx).node_type {
-                                    NodeType::File(file) => {
-                                        Label::new(cx, "FILE");
-                                    }
-
-                                    NodeType::Directory(directory) => {
-                                        node.then(TreeNode::node_type)
-                                            .then(NodeType::directory)
-                                            .get(cx)
-                                            .build(cx);
-
-                                        browser_widgets::Directory::new(cx, &directory);
-                                    }
-                                    NodeType::None => {
-                                        Label::new(cx, "NONE");
-                                    }
-                                };
+                                info!("list element {} {}", item.clone().get(cx).label, index);
+                                let node_type = item.then(TreeNode::node_type);
+                                NodeView::new().view(cx, node_type);
                             })
                             .height(Auto);
                         })
@@ -266,8 +272,8 @@ impl FileViewPanel {
             |cx| {
                 // The actual browser panel
 
-                let browser_tree = UiData::state.then(UiState::browser.then(BrowserState::tree));
-                browser_tree.get(cx).build(cx);
+                let browser_tree =
+                    UiData::state.then(UiState::browser.then(BrowserState::browser_tree));
                 FileView::new().view(cx, browser_tree);
             },
         )

@@ -140,7 +140,6 @@ impl UiData {
 
         let resource_loader = ResourceLoader::new(sample_rate);
 
-        // Fill with dummy state for now.
         let mut app_data = UiData {
             state: UiState {
                 channels: vec![
