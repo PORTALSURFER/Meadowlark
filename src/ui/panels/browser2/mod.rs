@@ -48,6 +48,8 @@ pub mod browser_widgets {
 
                 let is_open = node.clone().then(DirectoryNode::is_open);
 
+                let node1 = node.clone();
+
                 HStack::new(cx, |cx| {
                     Label::new(cx, "\u{e75c}")
                         .font("icon")
@@ -62,24 +64,30 @@ pub mod browser_widgets {
                 })
                 .cursor(CursorIcon::Hand)
                 .on_press(move |cx| {
+                    let item = node.clone().get(cx);
                     cx.focus();
-                    cx.emit(NodeEvent::SetSelected);
-                    cx.emit(DirectoryNodeEvent::ToggleOpen);
+                    //cx.emit(NodeEvent::SetSelected);
+                    cx.emit(DirectoryNodeEvent::ToggleOpen(item));
                 })
                 .col_between(Pixels(4.0))
                 .child_left(Pixels(15.0 * 0 as f32 + 5.0));
 
-                if node.get(cx).is_open {
-                    List::new(cx, node.then(DirectoryNode::children), |cx, index, node| {
+                let item = node1.clone();
+
+                if item.get(cx).is_open {
+                    List::new(cx, item.then(DirectoryNode::children), |cx, index, node| {
                         match node.get(cx).node_type {
                             NodeType::File(file) => {
-                                Label::new(cx, "FILE");
+                                Label::new(cx, "FILE - ()");
                             }
-                            NodeType::Directory(_) => {
-                                let node = node.then(TreeNode::node_type).then(NodeType::directory);
+                            NodeType::Directory(directory) => {
+                                //let node = node.then(TreeNode::node_type).then(NodeType::directory);
                                 //Directory::new(cx, node);
-                                Label::new(cx, "DIRECTORY");
-                                //NodeView::new().view(cx, node);
+                                // Label::new(
+                                //     cx,
+                                //     &format!("DIRECTORY - ({})", directory.path.to_str().unwrap()),
+                                // );
+                                NodeView::new().view(cx, node.clone());
                             }
                             NodeType::None => {
                                 Label::new(cx, "NONE");
@@ -198,6 +206,8 @@ impl NodeView {
                 let node = node.then(TreeNode::node_type).then(NodeType::directory);
                 //Label::new(cx, "DIRECTORY");
                 browser_widgets::Directory::new(cx, node);
+
+                //
             }
             NodeType::None => {
                 Label::new(cx, "NONE");

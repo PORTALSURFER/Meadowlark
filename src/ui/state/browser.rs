@@ -148,7 +148,7 @@ pub mod browser_state {
     pub struct FileNode {}
 
     pub enum DirectoryNodeEvent {
-        ToggleOpen,
+        ToggleOpen(DirectoryNode),
     }
 
     #[derive(Debug, Clone, Lens, Data)]
@@ -162,17 +162,20 @@ pub mod browser_state {
     impl Model for DirectoryNode {
         fn event(&mut self, cx: &mut EventContext, event: &mut Event) {
             event.map(|directory_node_event, _| match directory_node_event {
-                DirectoryNodeEvent::ToggleOpen => {
+                DirectoryNodeEvent::ToggleOpen(node) => {
                     info!("Toggle Open ({})", self.label);
-                    self.is_open = !self.is_open;
+                    if node.label == self.label {
+                        // todo yikes
+                        self.is_open = !self.is_open;
 
-                    if self.is_open {
-                        self.scan().expect("failed scan folder"); //todo better error handling
-                    } else {
-                        self.children.clear(); // todo, all this should update if needed.
+                        if self.is_open {
+                            self.scan().expect("failed scan folder"); //todo better error handling
+                        } else {
+                            self.children.clear(); // todo, all this should update if needed.
+                        }
+
+                        info!("{}", self.is_open);
                     }
-
-                    info!("{}", self.is_open);
                 }
             });
         }
